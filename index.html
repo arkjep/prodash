@@ -13,9 +13,9 @@
 			flex-direction: column;
 			align-items: center;
 			justify-content: space-between;
-			background-color: #f5f5f7;
+			background-color: #121212;
 			height: 100vh;
-			color: #333;
+			color: #e0e0e0;
 		}
 
 		.clock {
@@ -33,10 +33,12 @@
 			margin: 10px 0;
 			border-radius: 15px;
 			box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-			font-size: 2rem;
+			font-size: 3rem;
 			font-weight: 500;
 			cursor: pointer;
 			transition: transform 0.2s ease, background-color 0.2s ease;
+			background-color: #1e1e1e;
+			color: #e0e0e0;
 		}
 
 		.card:hover {
@@ -44,25 +46,25 @@
 		}
 
 		.mode {
-			background-color: #5bc0de;
-			color: #fff;
+			color: #e0e0e0;
+			background-color: #3a3a3a;
 		}
 
 		.target {
-			background-color: #5cb85c;
-			color: #fff;
+			color: #e0e0e0;
+			background-color: #3a3a3a;
 		}
 
 		.none {
-			background-color: #d3d3d3;
-			color: #fff;
+			color: #e0e0e0;
+			background-color: #3a3a3a;
 		}
 
 		.settings {
 			margin: 20px;
 			font-size: 1.5rem;
 			text-decoration: none;
-			color: #007bff;
+			color: #82aaff;
 			cursor: pointer;
 		}
 
@@ -75,12 +77,13 @@
 			top: 50%;
 			left: 50%;
 			transform: translate(-50%, -50%);
-			background-color: #fff;
 			box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
 			border-radius: 10px;
 			padding: 20px;
 			z-index: 1000;
 			display: none;
+			color: #e0e0e0;
+			background-color: #1e1e1e;
 		}
 
 		.modal.active {
@@ -158,8 +161,8 @@
 <body>
 	<div class="clock" id="clock">--:--</div>
 
-	<div class="card mode" id="mode">Deep Focus</div>
-	<div class="card target none" id="target">None</div>
+	<div class="card mode" id="mode"></div>
+	<div class="card target none" id="target"></div>
 
 	<a class="settings" id="settings">⚙ Settings</a>
 
@@ -225,7 +228,7 @@
 			} else {
 				currentTargetIndex = -1; // Switch to "None"
 				targetElement.textContent = "None";
-				targetElement.style.backgroundColor = '#d3d3d3';
+				targetElement.style.backgroundColor = '#3a3a3a';
 				targetElement.className = "card target none";
 			}
 		}
@@ -322,6 +325,18 @@
 
 		setInterval(updateClock, 1000);
 		updateClock();
+
+		document.addEventListener('DOMContentLoaded', (event) => {
+			const modeColors = JSON.parse(localStorage.getItem('modeColors')) || ['#3a3a3a'];
+			const targetColors = JSON.parse(localStorage.getItem('targetColors')) || ['#3a3a3a'];
+			const modes = JSON.parse(localStorage.getItem('modes')) || ['Default Mode'];
+			const targets = JSON.parse(localStorage.getItem('targets')) || ['Default Target'];
+
+			document.getElementById('mode').style.backgroundColor = modeColors[0];
+			document.getElementById('mode').innerText = modes[0];
+			document.getElementById('target').style.backgroundColor = targetColors[0];
+			document.getElementById('target').innerText = targets[0];
+		});
 	</script>
 </body>
 
