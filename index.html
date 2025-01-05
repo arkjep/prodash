@@ -53,6 +53,11 @@
 			color: #fff;
 		}
 
+		.none {
+			background-color: #d3d3d3;
+			color: #333;
+		}
+
 		.settings {
 			margin: 20px;
 			font-size: 1.5rem;
@@ -135,6 +140,10 @@
 			margin-right: 10px;
 		}
 
+		.list-item input[type="checkbox"] {
+			margin-right: 10px;
+		}
+
 		.list-item button {
 			background-color: #d9534f;
 			color: #fff;
@@ -150,7 +159,7 @@
 	<div class="clock" id="clock">--:--</div>
 
 	<div class="card mode" id="mode">Deep Focus</div>
-	<div class="card target" id="target">Client A</div>
+	<div class="card target none" id="target">None</div>
 
 	<a class="settings" id="settings">⚙ Settings</a>
 
@@ -190,8 +199,9 @@
 		let targets = JSON.parse(localStorage.getItem('targets')) || ['Client A', 'Project B', 'Subject C'];
 		let modeColors = JSON.parse(localStorage.getItem('modeColors')) || ['#f0ad4e', '#5bc0de', '#0275d8', '#5cb85c'];
 		let targetColors = JSON.parse(localStorage.getItem('targetColors')) || ['#5cb85c', '#5bc0de', '#f0ad4e'];
+		let modeActiveStates = JSON.parse(localStorage.getItem('modeActiveStates')) || [false, false, true, true];
 		let currentModeIndex = 3;
-		let currentTargetIndex = 0;
+		let currentTargetIndex = -1; // Default to "None"
 
 		function updateClock() {
 			const now = new Date();
@@ -206,15 +216,29 @@
 			currentModeIndex = (currentModeIndex + 1) % modes.length;
 			modeElement.textContent = modes[currentModeIndex];
 			modeElement.style.backgroundColor = modeColors[currentModeIndex];
+
+			if (modeActiveStates[currentModeIndex]) {
+				currentTargetIndex = 0; // Reset to first target
+				targetElement.textContent = targets[currentTargetIndex];
+				targetElement.style.backgroundColor = targetColors[currentTargetIndex];
+				targetElement.className = "card target";
+			} else {
+				currentTargetIndex = -1; // Switch to "None"
+				targetElement.textContent = "None";
+				targetElement.className = "card target none";
+			}
 		}
 
 		function cycleTarget() {
-			currentTargetIndex = (currentTargetIndex + 1) % targets.length;
-			targetElement.textContent = targets[currentTargetIndex];
-			targetElement.style.backgroundColor = targetColors[currentTargetIndex];
+			if (modeActiveStates[currentModeIndex]) {
+				currentTargetIndex = (currentTargetIndex + 1) % targets.length;
+				targetElement.textContent = targets[currentTargetIndex];
+				targetElement.style.backgroundColor = targetColors[currentTargetIndex];
+				targetElement.className = "card target";
+			}
 		}
 
-		function renderList(type, list, colors, container) {
+		function renderList(type, list, colors, container, activeStates) {
 			container.innerHTML = '';
 			list.forEach((item, index) => {
 				const listItem = document.createElement('div');
@@ -234,12 +258,23 @@
 					colors[index] = e.target.value;
 				});
 
+				if (type === 'mode') {
+					const activeCheckbox = document.createElement('input');
+					activeCheckbox.type = 'checkbox';
+					activeCheckbox.checked = activeStates[index];
+					activeCheckbox.addEventListener('change', (e) => {
+						activeStates[index] = e.target.checked;
+					});
+					listItem.appendChild(activeCheckbox);
+				}
+
 				const removeButton = document.createElement('button');
 				removeButton.textContent = 'Remove';
 				removeButton.addEventListener('click', () => {
 					list.splice(index, 1);
 					colors.splice(index, 1);
-					renderList(type, list, colors, container);
+					if (type === 'mode') activeStates.splice(index, 1);
+					renderList(type, list, colors, container, activeStates);
 				});
 
 				listItem.appendChild(textInput);
@@ -251,7 +286,7 @@
 		}
 
 		function openSettings() {
-			renderList('mode', modes, modeColors, modeList);
+			renderList('mode', modes, modeColors, modeList, modeActiveStates);
 			renderList('target', targets, targetColors, targetList);
 			settingsModal.classList.add('active');
 		}
@@ -265,16 +300,18 @@
 			localStorage.setItem('targets', JSON.stringify(targets));
 			localStorage.setItem('modeColors', JSON.stringify(modeColors));
 			localStorage.setItem('targetColors', JSON.stringify(targetColors));
+			localStorage.setItem('modeActiveStates', JSON.stringify(modeActiveStates));
 			closeSettings();
 		}
 
-		function addItem(list, colors, container) {
+		function addItem(list, colors, container, activeStates) {
 			list.push('New Item');
 			colors.push('#000000');
-			renderList('mode', list, colors, container);
+			if (activeStates) activeStates.push(true);
+			renderList('mode', list, colors, container, activeStates);
 		}
 
-		addModeButton.addEventListener('click', () => addItem(modes, modeColors, modeList));
+		addModeButton.addEventListener('click', () => addItem(modes, modeColors, modeList, modeActiveStates));
 		addTargetButton.addEventListener('click', () => addItem(targets, targetColors, targetList));
 		modeElement.addEventListener('click', cycleMode);
 		targetElement.addEventListener('click', cycleTarget);
