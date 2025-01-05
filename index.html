@@ -55,7 +55,7 @@
 
 		.none {
 			background-color: #d3d3d3;
-			color: #333;
+			color: #fff;
 		}
 
 		.settings {
@@ -225,6 +225,7 @@
 			} else {
 				currentTargetIndex = -1; // Switch to "None"
 				targetElement.textContent = "None";
+				targetElement.style.backgroundColor = '#d3d3d3';
 				targetElement.className = "card target none";
 			}
 		}
