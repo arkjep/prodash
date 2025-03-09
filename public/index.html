@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      background-color: #121212;
+      height: 100vh;
+      color: #e0e0e0;
+    }
+    .clock {
+      font-size: 4rem;
+      font-weight: 600;
+      margin: 20px 0;
+    }
+    .card {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 80%;
+      height: 120px;
+      margin: 10px 0;
+      border-radius: 15px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      font-size: 3rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: transform 0.2s ease, background-color 0.2s ease;
+      background-color: #1e1e1e;
+      color: #e0e0e0;
+    }
+    .card:hover {
+      transform: scale(1.05);
+    }
+    .mode, .target, .none {
+      background-color: #3a3a3a;
+    }
+    .settings {
+      margin: 20px;
+      font-size: 1.5rem;
+      text-decoration: none;
+      color: #82aaff;
+      cursor: pointer;
+    }
+    .settings:hover {
+      text-decoration: underline;
+    }
+    .modal {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+      border-radius: 10px;
+      padding: 20px;
+      z-index: 1000;
+      display: none;
+      background-color: #1e1e1e;
+    }
+    .modal.active {
+      display: block;
+    }
+    .modal-header {
+      font-size: 1.5rem;
+      margin-bottom: 10px;
+    }
+    .modal-content {
+      margin-bottom: 20px;
+    }
+    .spacer {
+      margin: 20px 0;
+      border-top: 1px solid #ccc;
+    }
+    .modal-footer {
+      display: flex;
+      justify-content: center;
+    }
+    .modal-footer button {
+      padding: 10px 20px;
+      font-size: 1rem;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin: 0 10px;
+    }
+    .modal-footer .save {
+      background-color: #5cb85c;
+      color: #fff;
+    }
+    .modal-footer .close {
+      background-color: #d9534f;
+      color: #fff;
+    }
+    .list-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .list-item input[type="text"] {
+      flex: 1;
+      margin-right: 10px;
+    }
+    .list-item input[type="color"] {
+      margin-right: 10px;
+    }
+    .list-item input[type="checkbox"] {
+      margin-right: 10px;
+    }
+    .list-item button {
+      background-color: #d9534f;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="clock" id="clock">--:--</div>
+  <div class="card mode" id="mode"></div>
+  <div class="card target none" id="target"></div>
+  <a class="settings" id="settings">⚙ Settings</a>
+  <div class="modal" id="settingsModal">
+    <div class="modal-header">Edit Modes, Targets & Colors</div>
+    <div class="modal-content">
+      <label for="modeList">Modes:</label>
+      <div id="modeList"></div>
+      <button id="addMode">Add Mode</button>
+      <div class="spacer"></div>
+      <label for="targetList">Targets:</label>
+      <div id="targetList"></div>
+      <button id="addTarget">Add Target</button>
+    </div>
+    <div class="modal-footer">
+      <button class="save" id="saveSettings">Save</button>
+      <button class="close" id="closeSettings">Close</button>
+    </div>
+  </div>
+
+  <!-- Socket.io client library -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    // Dashboard state variables
+    let dashboardState = {};
+    let modes = [];
+    let targets = [];
+    let modeColors = [];
+    let targetColors = [];
+    let modeActiveStates = [];
+    let currentModeIndex = 0;
+    let currentTargetIndex = -1;
+
+    // DOM elements
+    const clockElement = document.getElementById('clock');
+    const modeElement = document.getElementById('mode');
+    const targetElement = document.getElementById('target');
+    const settingsButton = document.getElementById('settings');
+    const settingsModal = document.getElementById('settingsModal');
+    const saveSettingsButton = document.getElementById('saveSettings');
+    const closeSettingsButton = document.getElementById('closeSettings');
+    const modeList = document.getElementById('modeList');
+    const targetList = document.getElementById('targetList');
+    const addModeButton = document.getElementById('addMode');
+    const addTargetButton = document.getElementById('addTarget');
+
+    // Clock update
+    function updateClock() {
+      const now = new Date();
+      let hours = now.getHours();
+      const minutes = now.getMinutes().toString().padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12 || 12;
+      clockElement.textContent = `${hours}:${minutes} ${ampm}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Cycle through modes and update state
+    function cycleMode() {
+      currentModeIndex = (currentModeIndex + 1) % modes.length;
+      modeElement.textContent = modes[currentModeIndex];
+      modeElement.style.backgroundColor = modeColors[currentModeIndex];
+      if (modeActiveStates[currentModeIndex]) {
+        currentTargetIndex = 0;
+        targetElement.textContent = targets[currentTargetIndex];
+        targetElement.style.backgroundColor = targetColors[currentTargetIndex];
+        targetElement.className = "card target";
+      } else {
+        currentTargetIndex = -1;
+        targetElement.textContent = "None";
+        targetElement.style.backgroundColor = '#3a3a3a';
+        targetElement.className = "card target none";
+      }
+      saveState();
+    }
+
+    // Cycle through targets if applicable
+    function cycleTarget() {
+      if (modeActiveStates[currentModeIndex]) {
+        currentTargetIndex = (currentTargetIndex + 1) % targets.length;
+        targetElement.textContent = targets[currentTargetIndex];
+        targetElement.style.backgroundColor = targetColors[currentTargetIndex];
+        targetElement.className = "card target";
+        saveState();
+      }
+    }
+
+    // Render editable lists in settings
+    function renderList(type, list, colors, container, activeStates) {
+      container.innerHTML = '';
+      list.forEach((item, index) => {
+        const listItem = document.createElement('div');
+        listItem.className = 'list-item';
+
+        const textInput = document.createElement('input');
+        textInput.type = 'text';
+        textInput.value = item;
+        textInput.addEventListener('input', (e) => {
+          list[index] = e.target.value;
+        });
+
+        const colorInput = document.createElement('input');
+        colorInput.type = 'color';
+        colorInput.value = colors[index];
+        colorInput.addEventListener('input', (e) => {
+          colors[index] = e.target.value;
+        });
+
+        if (type === 'mode') {
+          const activeCheckbox = document.createElement('input');
+          activeCheckbox.type = 'checkbox';
+          activeCheckbox.checked = activeStates[index];
+          activeCheckbox.addEventListener('change', (e) => {
+            activeStates[index] = e.target.checked;
+          });
+          listItem.appendChild(activeCheckbox);
+        }
+
+        const removeButton = document.createElement('button');
+        removeButton.textContent = 'Remove';
+        removeButton.addEventListener('click', () => {
+          list.splice(index, 1);
+          colors.splice(index, 1);
+          if (type === 'mode') activeStates.splice(index, 1);
+          renderList(type, list, colors, container, activeStates);
+        });
+
+        listItem.appendChild(textInput);
+        listItem.appendChild(colorInput);
+        listItem.appendChild(removeButton);
+        container.appendChild(listItem);
+      });
+    }
+
+    function openSettings() {
+      renderList('mode', modes, modeColors, modeList, modeActiveStates);
+      renderList('target', targets, targetColors, targetList);
+      settingsModal.classList.add('active');
+    }
+
+    function closeSettings() {
+      settingsModal.classList.remove('active');
+    }
+
+    // Save state by sending it to the server
+    function saveState() {
+      dashboardState = {
+        ...dashboardState,
+        modes: JSON.stringify(modes),
+        targets: JSON.stringify(targets),
+        modeColors: JSON.stringify(modeColors),
+        targetColors: JSON.stringify(targetColors),
+        modeActiveStates: JSON.stringify(modeActiveStates),
+        currentModeIndex,
+        currentTargetIndex
+      };
+      fetch('/updateState', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dashboardState)
+      })
+      .then(res => res.json())
+      .then(data => {
+        console.log('State updated:', data);
+      })
+      .catch(err => console.error(err));
+    }
+
+    addModeButton.addEventListener('click', () => {
+      modes.push('New Mode');
+      modeColors.push('#000000');
+      modeActiveStates.push(true);
+      renderList('mode', modes, modeColors, modeList, modeActiveStates);
+    });
+
+    addTargetButton.addEventListener('click', () => {
+      targets.push('New Target');
+      targetColors.push('#000000');
+      renderList('target', targets, targetColors, targetList);
+    });
+
+    modeElement.addEventListener('click', cycleMode);
+    targetElement.addEventListener('click', cycleTarget);
+    settingsButton.addEventListener('click', openSettings);
+    closeSettingsButton.addEventListener('click', closeSettings);
+    saveSettingsButton.addEventListener('click', () => {
+      saveState();
+      closeSettings();
+    });
+
+    // Listen for state updates from the server
+    socket.on('stateUpdated', (state) => {
+      dashboardState = state;
+      modes = JSON.parse(state.modes);
+      targets = JSON.parse(state.targets);
+      modeColors = JSON.parse(state.modeColors);
+      targetColors = JSON.parse(state.targetColors);
+      modeActiveStates = JSON.parse(state.modeActiveStates);
+      currentModeIndex = state.currentModeIndex;
+      currentTargetIndex = state.currentTargetIndex;
+
+      modeElement.textContent = modes[currentModeIndex];
+      modeElement.style.backgroundColor = modeColors[currentModeIndex];
+      if (currentTargetIndex >= 0) {
+        targetElement.textContent = targets[currentTargetIndex];
+        targetElement.style.backgroundColor = targetColors[currentTargetIndex];
+        targetElement.className = "card target";
+      } else {
+        targetElement.textContent = "None";
+        targetElement.style.backgroundColor = '#3a3a3a';
+        targetElement.className = "card target none";
+      }
+    });
+
+    // On initial load, fetch state from the server
+    fetch('/getState')
+      .then(res => res.json())
+      .then(state => {
+        // Emit a local update so that the stateUpdated listener sets everything up
+        socket.emit('stateUpdated', state);
+      })
+      .catch(err => console.error(err));
+  </script>
+</body>
+</html>
