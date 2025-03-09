@@ -6,9 +6,11 @@ const mysql = require('mysql');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
+const io = socketIo(server, {
+  path: '/prodash/socket.io'
+});
 
-app.use(express.static(__dirname + '/public'));
+app.use('/prodash', express.static(__dirname + '/public'));
 app.use(express.json());
 
 const db = mysql.createConnection({
@@ -36,6 +38,7 @@ function getDashboardState(callback) {
     } else {
       // If no state exists, initialize one
       const initState = {
+        id: 1,
         modes: JSON.stringify(['Rest', 'Break', 'Light Work', 'Deep Focus']),
         targets: JSON.stringify(['Client A', 'Project B', 'Subject C']),
         modeColors: JSON.stringify(['#f0ad4e', '#5bc0de', '#0275d8', '#5cb85c']),
@@ -44,17 +47,29 @@ function getDashboardState(callback) {
         currentModeIndex: 3,
         currentTargetIndex: -1
       };
-      const insertQuery = 'INSERT INTO prodash_state SET id = 1, ? ON DUPLICATE KEY UPDATE ?';
+      
+      const insertQuery = `
+        INSERT INTO prodash_state SET ?
+        ON DUPLICATE KEY UPDATE
+          modes = VALUES(modes),
+          targets = VALUES(targets),
+          modeColors = VALUES(modeColors),
+          targetColors = VALUES(targetColors),
+          modeActiveStates = VALUES(modeActiveStates),
+          currentModeIndex = VALUES(currentModeIndex),
+          currentTargetIndex = VALUES(currentTargetIndex)
+      `;
+      
       db.query(insertQuery, initState, (err, result) => {
         if (err) return callback(err);
-        callback(null, Object.assign({ id: result.insertId }, initState));
+        callback(null, initState);
       });
     }
   });
 }
 
 // API endpoint to get the dashboard state
-app.get('/getState', (req, res) => {
+app.get('/prodash/getState', (req, res) => {
   getDashboardState((err, state) => {
     if (err) {
       console.error('Error fetching state:', err);
@@ -66,7 +81,7 @@ app.get('/getState', (req, res) => {
 
 // API endpoint to update the dashboard state.
 // The client sends a complete state JSON, including the "id" field.
-app.post('/updateState', (req, res) => {
+app.post('/prodash/updateState', (req, res) => {
   const newState = req.body;
   const updateQuery = 'UPDATE prodash_state SET ? WHERE id = ?';
   db.query(updateQuery, [newState, newState.id], (err, result) => {
@@ -75,7 +90,7 @@ app.post('/updateState', (req, res) => {
       return res.status(500).json({ error: 'Database update error' });
     }
     // Broadcast the updated state to all connected clients
-    io.emit('stateUpdated', newState);
+    io.emit('prodash/stateUpdated', newState);
     res.json({ success: true });
   });
 });
@@ -85,7 +100,7 @@ io.on('connection', (socket) => {
   console.log('A user connected');
   getDashboardState((err, state) => {
     if (!err) {
-      socket.emit('stateUpdated', state);
+      socket.emit('prodash/stateUpdated', state);
     }
   });
   socket.on('disconnect', () => {
