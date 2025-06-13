@@ -156,6 +156,12 @@
     .timer-button.stop:hover {
       background-color: #c62828;
     }
+    .timer-button.pause {
+      background-color: #ff9800;
+    }
+    .timer-button.pause:hover {
+      background-color: #f57c00;
+    }
     .timer-display.alarm {
       animation: flash 1s infinite;
     }
@@ -177,8 +183,9 @@
 
   <!-- Timer element -->
   <div class="timer-container" style="display: none;" id="timer-container">
-    <div class="timer-display" id="timer-display">00:00</div>
-    <div class="timer-buttons">
+    <div class="timer-controls" style="display: flex; align-items: center; gap: 15px;">
+      <div class="timer-display" id="timer-display">00:00</div>
+      <button class="timer-button pause" id="timer-pause">Pause</button>
       <button class="timer-button stop" id="timer-stop">Stop</button>
     </div>
   </div>
@@ -250,12 +257,15 @@
     const timerDisplay = document.getElementById('timer-display');
     const timerStopButton = document.getElementById('timer-stop');
     const alarmSound = document.getElementById('alarm-sound');
+    const timerPauseButton = document.getElementById('timer-pause');
     
     // Timer variables
     let timerInterval = null;
     let timerEndTime = null;
     let isTimerRunning = false;
     let isAlarmActive = false;
+    let isPaused = false;
+    let pausedTimeRemaining = null;
 
     // Clock update
     function updateClock() {
@@ -272,7 +282,10 @@
     // Timer functions
     function startTimer(minutes) {
       stopTimer(false);
-
+      isPaused = false;
+      pausedTimeRemaining = null;
+      timerPauseButton.textContent = 'Pause';
+      
       timerContainer.style.display = '';
 
       const now = new Date();
@@ -340,6 +353,8 @@
       clearInterval(timerInterval);
       isTimerRunning = false;
       isAlarmActive = false;
+      isPaused = false;
+      pausedTimeRemaining = null;
 
       timerDisplay.textContent = "00:00";
       timerDisplay.classList.remove('alarm');
@@ -359,8 +374,52 @@
       }
     }
 
+    // Pause/unpause functionality
+    function togglePause() {
+      if (!isTimerRunning && !isPaused) return;
+      
+      if (isPaused) {
+        // Unpause - restart the timer with remaining time
+        isPaused = false;
+        timerPauseButton.textContent = 'Pause';
+        
+        const now = new Date();
+        timerEndTime = new Date(now.getTime() + pausedTimeRemaining);
+        isTimerRunning = true;
+        
+        updateTimerDisplay();
+        timerInterval = setInterval(updateTimerDisplay, 1000);
+        
+        // Resume music if it was playing for this mode
+        if (modeMusicStates[currentModeIndex]) {
+          musicPlayer.play().catch(err => console.error('Error playing music:', err));
+        }
+      } else {
+        // Pause - stop the timer but remember remaining time
+        isPaused = true;
+        timerPauseButton.textContent = 'Unpause';
+        
+        // Calculate remaining time
+        const now = new Date();
+        pausedTimeRemaining = timerEndTime - now;
+        
+        // Clear the interval
+        clearInterval(timerInterval);
+        isTimerRunning = false;
+        
+        // Pause music if playing
+        if (!musicPlayer.paused) {
+          musicPlayer.pause();
+        }
+      }
+      
+      // Save state to synchronize with other clients
+      saveState();
+    }
+
     // Timer event listeners
     timerStopButton.addEventListener('click', stopTimer);
+    timerPauseButton.addEventListener('click', togglePause);
 
     // Cycle through modes and update state
     function cycleMode() {
@@ -535,7 +594,9 @@
         modeMusicStates: JSON.stringify(modeMusicStates),
         currentModeIndex,
         currentTargetIndex,
-        timerEndTime: isTimerRunning ? timerEndTime.getTime() : null
+        timerEndTime: isTimerRunning ? timerEndTime.getTime() : null,
+        isPaused: isPaused,
+        pausedTimeRemaining: isPaused ? pausedTimeRemaining : null
       };
       fetch('/prodash/updateState', {
         method: 'POST',
@@ -620,22 +681,24 @@
         const now = new Date();
         
         if (endTime > now) {
-          // There's an active timer from another client
-          clearInterval(timerInterval);
-          timerEndTime = endTime;
-          isTimerRunning = true;
-          timerContainer.style.display = '';
-          
-          updateTimerDisplay();
-          timerInterval = setInterval(updateTimerDisplay, 1000);
-          
-          // Start music if needed for this mode
-          if (modeMusicStates[currentModeIndex] && musicPlayer.paused) {
-            loadMusicPlaylist();
-            setTimeout(playNextSong, 500);
-          } else {
-            musicPlayer.pause();
-            musicPlayer.currentTime = 0;
+          if (!timerEndTime || endTime.getTime() !== timerEndTime.getTime()) {
+            // There's an active timer from another client
+            clearInterval(timerInterval);
+            timerEndTime = endTime;
+            isTimerRunning = true;
+            timerContainer.style.display = '';
+            
+            updateTimerDisplay();
+            timerInterval = setInterval(updateTimerDisplay, 1000);
+            
+            // Start music if needed for this mode
+            if (modeMusicStates[currentModeIndex] && musicPlayer.paused) {
+              loadMusicPlaylist();
+              setTimeout(playNextSong, 500);
+            } else {
+              musicPlayer.pause();
+              musicPlayer.currentTime = 0;
+            }
           }
         } else {
           // Timer has already ended
@@ -644,6 +707,25 @@
       } else {
         // No timer is set
         stopTimer(false);
+      }
+
+      // Handle pause state synchronization
+      isPaused = state.isPaused || false;
+      pausedTimeRemaining = state.pausedTimeRemaining || null;
+      
+      if (isPaused && pausedTimeRemaining) {
+        // Display paused timer
+        timerContainer.style.display = '';
+        timerPauseButton.textContent = 'Unpause';
+        
+        const minutes = Math.floor(pausedTimeRemaining / 60000);
+        const seconds = Math.floor((pausedTimeRemaining % 60000) / 1000);
+        
+        timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        
+        // Ensure timer interval is cleared
+        clearInterval(timerInterval);
+        isTimerRunning = false;
       }
     });
 
