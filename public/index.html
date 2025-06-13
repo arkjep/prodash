@@ -35,7 +35,7 @@
       cursor: pointer;
       transition: transform 0.2s ease, background-color 0.2s ease;
       background-color: #1e1e1e;
-      color: #e0e0e0;
+      color: #000000;
     }
     .card:hover {
       transform: scale(1.05);
@@ -122,10 +122,66 @@
       padding: 5px 10px;
       cursor: pointer;
     }
+    /* Timer styles */
+    .timer-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 15px 0;
+    }
+    .timer-display {
+      font-size: 2.5rem;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    .timer-buttons {
+      display: flex;
+      gap: 10px;
+    }
+    .timer-button {
+      padding: 8px 15px;
+      background-color: #1e88e5;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    .timer-button:hover {
+      background-color: #1565c0;
+    }
+    .timer-button.stop {
+      background-color: #e53935;
+    }
+    .timer-button.stop:hover {
+      background-color: #c62828;
+    }
+    .timer-display.alarm {
+      animation: flash 1s infinite;
+    }
+    @keyframes flash {
+      0%, 49% {
+        background-color: transparent;
+      }
+      50%, 100% {
+        background-color: #e53935;
+      }
+    }
   </style>
 </head>
 <body>
   <div class="clock" id="clock">--:--</div>
+  
+  <!-- Timer element -->
+  <div class="timer-container">
+    <div class="timer-display" id="timer-display">00:00</div>
+    <div class="timer-buttons">
+      <button class="timer-button" id="timer-5">5 min</button>
+      <button class="timer-button" id="timer-30">30 min</button>
+      <button class="timer-button stop" id="timer-stop">Stop</button>
+    </div>
+  </div>
+  
   <div class="card mode" id="mode"></div>
   <div class="card target none" id="target"></div>
   <a class="settings" id="settings">⚙ Settings</a>
@@ -145,6 +201,12 @@
       <button class="close" id="closeSettings">Close</button>
     </div>
   </div>
+
+  <!-- Audio element for alarm -->
+  <audio id="alarm-sound" preload="auto">
+    <source src="/prodash/alarm.mp3" type="audio/mp3">
+    Your browser does not support the audio element.
+  </audio>
 
   <!-- Socket.io client library -->
   <script src="/prodash/socket.io/socket.io.js"></script>
@@ -176,6 +238,19 @@
     const addModeButton = document.getElementById('addMode');
     const addTargetButton = document.getElementById('addTarget');
 
+    // Timer elements
+    const timerDisplay = document.getElementById('timer-display');
+    const timer5Button = document.getElementById('timer-5');
+    const timer30Button = document.getElementById('timer-30');
+    const timerStopButton = document.getElementById('timer-stop');
+    const alarmSound = document.getElementById('alarm-sound');
+    
+    // Timer variables
+    let timerInterval = null;
+    let timerEndTime = null;
+    let isTimerRunning = false;
+    let isAlarmActive = false;
+
     // Clock update
     function updateClock() {
       const now = new Date();
@@ -187,6 +262,79 @@
     }
     setInterval(updateClock, 1000);
     updateClock();
+
+    // Timer functions
+    function startTimer(minutes) {
+      stopTimer();
+      
+      const now = new Date();
+      timerEndTime = new Date(now.getTime() + minutes * 60000);
+      isTimerRunning = true;
+      
+      updateTimerDisplay();
+      
+      timerInterval = setInterval(() => {
+        updateTimerDisplay();
+      }, 1000);
+    }
+    
+    function updateTimerDisplay() {
+      if (!isTimerRunning) return;
+      
+      const now = new Date();
+      const timeDiff = timerEndTime - now;
+      
+      if (timeDiff <= 0) {
+        triggerAlarm();
+        return;
+      }
+      
+      const minutes = Math.floor(timeDiff / 60000);
+      const seconds = Math.floor((timeDiff % 60000) / 1000);
+      
+      timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+    
+    function triggerAlarm() {
+      clearInterval(timerInterval);
+      isTimerRunning = false;
+      isAlarmActive = true;
+      
+      timerDisplay.textContent = "Time's up!";
+      timerDisplay.classList.add('alarm');
+
+      // Play alarm sound
+      playAlarmSound();
+    }
+
+    function playAlarmSound() {
+      alarmSound.currentTime = 0;
+      alarmSound.play();
+
+      // Loop the alarm sound
+      if (isAlarmActive) {
+        alarmSound.onended = playAlarmSound;
+      }
+    }
+
+    function stopTimer() {
+      clearInterval(timerInterval);
+      isTimerRunning = false;
+      isAlarmActive = false;
+
+      timerDisplay.textContent = "00:00";
+      timerDisplay.classList.remove('alarm');
+
+      // Stop alarm sound
+      alarmSound.pause();
+      alarmSound.currentTime = 0;
+      alarmSound.onended = null;
+    }
+
+    // Timer event listeners
+    timer5Button.addEventListener('click', () => startTimer(5));
+    timer30Button.addEventListener('click', () => startTimer(30));
+    timerStopButton.addEventListener('click', stopTimer);
 
     // Cycle through modes and update state
     function cycleMode() {
