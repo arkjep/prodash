@@ -367,16 +367,30 @@
       currentModeIndex = (currentModeIndex + 1) % modes.length;
       modeElement.textContent = modes[currentModeIndex];
       modeElement.style.backgroundColor = modeColors[currentModeIndex];
+      
       if (modeActiveStates[currentModeIndex]) {
-        currentTargetIndex = 0;
+        // If targets are enabled for this mode, make sure we have a valid target
+        if (currentTargetIndex < 0 || currentTargetIndex >= targets.length) {
+          currentTargetIndex = 0;
+        }
         targetElement.textContent = targets[currentTargetIndex];
         targetElement.style.backgroundColor = targetColors[currentTargetIndex];
         targetElement.className = "card target";
+        targetElement.style.opacity = "1"; // Ensure full opacity
       } else {
-        currentTargetIndex = -1;
-        targetElement.textContent = "None";
-        targetElement.style.backgroundColor = '#3a3a3a';
-        targetElement.className = "card target none";
+        // Preserve target but dim it
+        if (currentTargetIndex >= 0 && currentTargetIndex < targets.length) {
+          // Keep the same target, just dim it
+          targetElement.style.opacity = "0.3"; // Dim the target
+          targetElement.className = "card target";
+        } else {
+          // If no valid target exists, show first target dimmed
+          currentTargetIndex = 0;
+          targetElement.textContent = targets[currentTargetIndex];
+          targetElement.style.backgroundColor = targetColors[currentTargetIndex];
+          targetElement.style.opacity = "0.3";
+          targetElement.className = "card target";
+        }
       }
 
       if (modeTimes[currentModeIndex] > 0) {
@@ -572,14 +586,32 @@
 
       modeElement.textContent = modes[currentModeIndex];
       modeElement.style.backgroundColor = modeColors[currentModeIndex];
+      
       if (currentTargetIndex >= 0) {
         targetElement.textContent = targets[currentTargetIndex];
         targetElement.style.backgroundColor = targetColors[currentTargetIndex];
         targetElement.className = "card target";
+        
+        // Apply proper opacity based on whether targets are active for this mode
+        if (modeActiveStates[currentModeIndex]) {
+          targetElement.style.opacity = "1";
+        } else {
+          targetElement.style.opacity = "0.3";
+        }
       } else {
-        targetElement.textContent = "None";
-        targetElement.style.backgroundColor = '#3a3a3a';
-        targetElement.className = "card target none";
+        // If no target is set (edge case)
+        if (targets.length > 0) {
+          currentTargetIndex = 0;
+          targetElement.textContent = targets[currentTargetIndex];
+          targetElement.style.backgroundColor = targetColors[currentTargetIndex];
+          targetElement.className = "card target";
+          targetElement.style.opacity = modeActiveStates[currentModeIndex] ? "1" : "0.3";
+        } else {
+          targetElement.textContent = "Add targets in settings";
+          targetElement.style.backgroundColor = '#3a3a3a';
+          targetElement.className = "card target";
+          targetElement.style.opacity = "0.5";
+        }
       }
 
       // Handle timer synchronization
