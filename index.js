@@ -49,6 +49,7 @@ function getDashboardState(callback) {
         currentModeIndex: 3,
         currentTargetIndex: -1,
         timerEndTime: null,
+        pausedTimeRemaining: null,
       };
 
       const insertQuery = `
@@ -63,7 +64,8 @@ function getDashboardState(callback) {
           modeMusicStates = VALUES(modeMusicStates),
           currentModeIndex = VALUES(currentModeIndex),
           currentTargetIndex = VALUES(currentTargetIndex),
-          timerEndTime = VALUES(timerEndTime)
+          timerEndTime = VALUES(timerEndTime),
+          pausedTimeRemaining = VALUES(pausedTimeRemaining)
       `;
       
       db.query(insertQuery, initState, (err, result) => {

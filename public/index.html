@@ -460,14 +460,25 @@
 
       if (modeMusicStates[currentModeIndex]) {
         if (isTimerRunning) {
+          // Stop any current music first
+          musicPlayer.pause();
+          musicPlayer.currentTime = 0;
+          musicPlayer.onended = null;
+          
+          // Load playlist then play one song after a brief delay
           loadMusicPlaylist();
           setTimeout(() => {
-            playNextSong();
+            // Only play if timer is still running after the delay
+            if (isTimerRunning && !isPaused) {
+              playNextSong();
+            }
           }, 500);
         }
       } else {
+        // Stop music when switching to a mode without music
         musicPlayer.pause();
         musicPlayer.currentTime = 0;
+        musicPlayer.onended = null;
       }
     }
 
@@ -595,7 +606,6 @@
         currentModeIndex,
         currentTargetIndex,
         timerEndTime: isTimerRunning ? timerEndTime.getTime() : null,
-        isPaused: isPaused,
         pausedTimeRemaining: isPaused ? pausedTimeRemaining : null
       };
       fetch('/prodash/updateState', {
@@ -710,13 +720,15 @@
       }
 
       // Handle pause state synchronization
-      isPaused = state.isPaused || false;
+      isPaused = state.pausedTimeRemaining ? true : false;
       pausedTimeRemaining = state.pausedTimeRemaining || null;
-      
+
+      // Update the pause button text to reflect the current state
+      timerPauseButton.textContent = isPaused ? 'Unpause' : 'Pause';
+
       if (isPaused && pausedTimeRemaining) {
         // Display paused timer
         timerContainer.style.display = '';
-        timerPauseButton.textContent = 'Unpause';
         
         const minutes = Math.floor(pausedTimeRemaining / 60000);
         const seconds = Math.floor((pausedTimeRemaining % 60000) / 1000);
@@ -726,6 +738,9 @@
         // Ensure timer interval is cleared
         clearInterval(timerInterval);
         isTimerRunning = false;
+      } else if (state.timerEndTime && !isPaused) {
+        // Make sure the button shows "Pause" for active timers
+        timerPauseButton.textContent = 'Pause';
       }
     });
 
@@ -745,11 +760,17 @@
 
     // Fetch the music playlist from the server
     function loadMusicPlaylist() {
+      // Cancel any active playback first
+      musicPlayer.pause();
+      musicPlayer.currentTime = 0;
+      musicPlayer.onended = null;
+      
       fetch('/prodash/music-list.json')
         .then(res => res.json())
         .then(musicFiles => {
           playlist = musicFiles;
           shufflePlaylist();
+          // Don't automatically start playback here
         })
         .catch(err => console.error('Error loading music:', err));
     }
@@ -764,13 +785,31 @@
 
     // Play the next song in the playlist
     function playNextSong() {
-      if (playlist.length === 0 || !isTimerRunning) return;
+      if (playlist.length === 0 || !isTimerRunning || isPaused) return;
 
+      // Make sure previous song is stopped
+      musicPlayer.pause();
+      musicPlayer.currentTime = 0;
+      
+      // Clear any pending event handlers
+      musicPlayer.onended = null;
+      
+      // Select next song
       currentSongIndex = (currentSongIndex + 1) % playlist.length;
       const song = playlist[currentSongIndex];
 
+      // Set source and play with proper error handling
       musicPlayer.src = `/prodash/music/${song}`;
-      musicPlayer.play().catch(err => console.error('Error playing music:', err));
+      
+      // Add onended handler before playing
+      musicPlayer.onended = playNextSong;
+      
+      // Play the song
+      musicPlayer.play().catch(err => {
+        console.error('Error playing music:', err);
+        // Reset onended handler if play fails
+        musicPlayer.onended = null;
+      });
     }
 
     // Add event listeners for music player
