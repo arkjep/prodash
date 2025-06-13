@@ -44,8 +44,11 @@ function getDashboardState(callback) {
         modeColors: JSON.stringify(['#f0ad4e', '#5bc0de', '#0275d8', '#5cb85c']),
         targetColors: JSON.stringify(['#5cb85c', '#5bc0de', '#f0ad4e']),
         modeActiveStates: JSON.stringify([false, false, true, true]),
+        modeTimes: JSON.stringify([0, 0, 0, 0]),
+        modeMusicStates: JSON.stringify([false, false, false, false]),
         currentModeIndex: 3,
-        currentTargetIndex: -1
+        currentTargetIndex: -1,
+        timerEndTime: null,
       };
 
       const insertQuery = `
@@ -56,8 +59,11 @@ function getDashboardState(callback) {
           modeColors = VALUES(modeColors),
           targetColors = VALUES(targetColors),
           modeActiveStates = VALUES(modeActiveStates),
+          modeTimes = VALUES(modeTimes),
+          modeMusicStates = VALUES(modeMusicStates),
           currentModeIndex = VALUES(currentModeIndex),
-          currentTargetIndex = VALUES(currentTargetIndex)
+          currentTargetIndex = VALUES(currentTargetIndex),
+          timerEndTime = VALUES(timerEndTime)
       `;
       
       db.query(insertQuery, initState, (err, result) => {

@@ -172,6 +172,9 @@
 <body>
   <div class="clock" id="clock">--:--</div>
 
+  <div class="card mode" id="mode"></div>
+  <div class="card target none" id="target"></div>
+
   <!-- Timer element -->
   <div class="timer-container" style="display: none;" id="timer-container">
     <div class="timer-display" id="timer-display">00:00</div>
@@ -180,8 +183,6 @@
     </div>
   </div>
 
-  <div class="card mode" id="mode"></div>
-  <div class="card target none" id="target"></div>
   <a class="settings" id="settings">⚙ Settings</a>
   <div class="modal" id="settingsModal">
     <div class="modal-header">Edit Modes, Targets & Colors</div>
@@ -270,7 +271,7 @@
 
     // Timer functions
     function startTimer(minutes) {
-      stopTimer();
+      stopTimer(false);
 
       timerContainer.style.display = '';
 
@@ -283,6 +284,9 @@
       timerInterval = setInterval(() => {
         updateTimerDisplay();
       }, 1000);
+
+      // Save state to synchronize with other clients
+      saveState();
     }
     
     function updateTimerDisplay() {
@@ -306,12 +310,18 @@
       clearInterval(timerInterval);
       isTimerRunning = false;
       isAlarmActive = true;
-      
+
       timerDisplay.textContent = "Time's up!";
       timerDisplay.classList.add('alarm');
 
       // Play alarm sound
       playAlarmSound();
+
+      // Stop music if playing
+      if (!musicPlayer.paused) {
+        musicPlayer.pause();
+        musicPlayer.currentTime = 0;
+      }
     }
 
     function playAlarmSound() {
@@ -324,7 +334,7 @@
       }
     }
 
-    function stopTimer() {
+    function stopTimer(sync) {
       timerContainer.style.display = 'none';
 
       clearInterval(timerInterval);
@@ -342,6 +352,11 @@
       // Stop music if playing
       musicPlayer.pause();
       musicPlayer.currentTime = 0;
+
+      if (sync !== false) {
+        // Save state to synchronize with other clients
+        saveState();
+      }
     }
 
     // Timer event listeners
@@ -367,7 +382,7 @@
       if (modeTimes[currentModeIndex] > 0) {
         startTimer(modeTimes[currentModeIndex]);
       } else {
-        stopTimer();
+        stopTimer(true);
       }
 
       if (modeMusicStates[currentModeIndex]) {
@@ -381,8 +396,6 @@
         musicPlayer.pause();
         musicPlayer.currentTime = 0;
       }
-
-      saveState();
     }
 
     // Cycle through targets if applicable
@@ -507,7 +520,8 @@
         modeTimes: JSON.stringify(modeTimes),
         modeMusicStates: JSON.stringify(modeMusicStates),
         currentModeIndex,
-        currentTargetIndex
+        currentTargetIndex,
+        timerEndTime: isTimerRunning ? timerEndTime.getTime() : null
       };
       fetch('/prodash/updateState', {
         method: 'POST',
@@ -566,6 +580,38 @@
         targetElement.textContent = "None";
         targetElement.style.backgroundColor = '#3a3a3a';
         targetElement.className = "card target none";
+      }
+
+      // Handle timer synchronization
+      if (state.timerEndTime) {
+        const endTime = new Date(parseInt(state.timerEndTime)); // Parse as integer
+        const now = new Date();
+        
+        if (endTime > now) {
+          // There's an active timer from another client
+          clearInterval(timerInterval);
+          timerEndTime = endTime;
+          isTimerRunning = true;
+          timerContainer.style.display = '';
+          
+          updateTimerDisplay();
+          timerInterval = setInterval(updateTimerDisplay, 1000);
+          
+          // Start music if needed for this mode
+          if (modeMusicStates[currentModeIndex] && musicPlayer.paused) {
+            loadMusicPlaylist();
+            setTimeout(playNextSong, 500);
+          } else {
+            musicPlayer.pause();
+            musicPlayer.currentTime = 0;
+          }
+        } else {
+          // Timer has already ended
+          stopTimer(false);
+        }
+      } else {
+        // No timer is set
+        stopTimer(false);
       }
     });
 
