@@ -4,3 +4,7 @@ jspm_packages/
 
 # Config files
 .env
+
+#music
+public/music/*
+public/music-list.json

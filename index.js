@@ -47,7 +47,7 @@ function getDashboardState(callback) {
         currentModeIndex: 3,
         currentTargetIndex: -1
       };
-      
+
       const insertQuery = `
         INSERT INTO prodash_state SET ?
         ON DUPLICATE KEY UPDATE

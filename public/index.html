@@ -171,17 +171,15 @@
 </head>
 <body>
   <div class="clock" id="clock">--:--</div>
-  
+
   <!-- Timer element -->
-  <div class="timer-container">
+  <div class="timer-container" style="display: none;" id="timer-container">
     <div class="timer-display" id="timer-display">00:00</div>
     <div class="timer-buttons">
-      <button class="timer-button" id="timer-5">5 min</button>
-      <button class="timer-button" id="timer-30">30 min</button>
       <button class="timer-button stop" id="timer-stop">Stop</button>
     </div>
   </div>
-  
+
   <div class="card mode" id="mode"></div>
   <div class="card target none" id="target"></div>
   <a class="settings" id="settings">⚙ Settings</a>
@@ -207,6 +205,12 @@
     <source src="/prodash/alarm.mp3" type="audio/mp3">
     Your browser does not support the audio element.
   </audio>
+  
+  <!-- Background music player -->
+  <div class="music-container">
+    <audio id="music-player" preload="none"></audio>
+    <div id="now-playing" class="now-playing" style="font-size: 0.8rem; margin: 5px 0; text-align: center; display: none;"></div>
+  </div>
 
   <!-- Socket.io client library -->
   <script src="/prodash/socket.io/socket.io.js"></script>
@@ -220,6 +224,8 @@
     let modes = [];
     let targets = [];
     let modeColors = [];
+    let modeTimes = [];
+    let modeMusicStates = [];
     let targetColors = [];
     let modeActiveStates = [];
     let currentModeIndex = 0;
@@ -239,9 +245,8 @@
     const addTargetButton = document.getElementById('addTarget');
 
     // Timer elements
+    const timerContainer = document.getElementById('timer-container');
     const timerDisplay = document.getElementById('timer-display');
-    const timer5Button = document.getElementById('timer-5');
-    const timer30Button = document.getElementById('timer-30');
     const timerStopButton = document.getElementById('timer-stop');
     const alarmSound = document.getElementById('alarm-sound');
     
@@ -266,13 +271,15 @@
     // Timer functions
     function startTimer(minutes) {
       stopTimer();
-      
+
+      timerContainer.style.display = '';
+
       const now = new Date();
       timerEndTime = new Date(now.getTime() + minutes * 60000);
       isTimerRunning = true;
-      
+
       updateTimerDisplay();
-      
+
       timerInterval = setInterval(() => {
         updateTimerDisplay();
       }, 1000);
@@ -318,6 +325,8 @@
     }
 
     function stopTimer() {
+      timerContainer.style.display = 'none';
+
       clearInterval(timerInterval);
       isTimerRunning = false;
       isAlarmActive = false;
@@ -329,11 +338,13 @@
       alarmSound.pause();
       alarmSound.currentTime = 0;
       alarmSound.onended = null;
+
+      // Stop music if playing
+      musicPlayer.pause();
+      musicPlayer.currentTime = 0;
     }
 
     // Timer event listeners
-    timer5Button.addEventListener('click', () => startTimer(5));
-    timer30Button.addEventListener('click', () => startTimer(30));
     timerStopButton.addEventListener('click', stopTimer);
 
     // Cycle through modes and update state
@@ -352,6 +363,25 @@
         targetElement.style.backgroundColor = '#3a3a3a';
         targetElement.className = "card target none";
       }
+
+      if (modeTimes[currentModeIndex] > 0) {
+        startTimer(modeTimes[currentModeIndex]);
+      } else {
+        stopTimer();
+      }
+
+      if (modeMusicStates[currentModeIndex]) {
+        if (isTimerRunning) {
+          loadMusicPlaylist();
+          setTimeout(() => {
+            playNextSong();
+          }, 500);
+        }
+      } else {
+        musicPlayer.pause();
+        musicPlayer.currentTime = 0;
+      }
+
       saveState();
     }
 
@@ -367,7 +397,7 @@
     }
 
     // Render editable lists in settings
-    function renderList(type, list, colors, container, activeStates) {
+    function renderList(type, list, colors, container, activeStates, times, musicStates) {
       container.innerHTML = '';
       list.forEach((item, index) => {
         const listItem = document.createElement('div');
@@ -388,6 +418,11 @@
         });
 
         if (type === 'mode') {
+          // Add active state checkbox for modes
+          const activeLabel = document.createElement('label');
+          activeLabel.textContent = '🏃🏻‍♀️‍➡️ ';
+          listItem.appendChild(activeLabel);
+
           const activeCheckbox = document.createElement('input');
           activeCheckbox.type = 'checkbox';
           activeCheckbox.checked = activeStates[index];
@@ -395,6 +430,39 @@
             activeStates[index] = e.target.checked;
           });
           listItem.appendChild(activeCheckbox);
+          
+          // Add time input field
+          const timeLabel = document.createElement('label');
+          timeLabel.textContent = ' 🕠 ';
+          listItem.appendChild(timeLabel);
+          
+          const timeInput = document.createElement('input');
+          timeInput.type = 'number';
+          timeInput.min = '0';
+          timeInput.style.width = '50px';
+          timeInput.style.marginRight = '5px';
+          timeInput.value = times && times[index] ? times[index] : 0;
+          timeInput.addEventListener('input', (e) => {
+            if (times) {
+              times[index] = parseInt(e.target.value, 10) || 0;
+            }
+          });
+          listItem.appendChild(timeInput);
+
+          // Add music checkbox
+          const musicLabel = document.createElement('label');
+          musicLabel.textContent = ' ♫ ';
+          listItem.appendChild(musicLabel);
+
+          const musicCheckbox = document.createElement('input');
+          musicCheckbox.type = 'checkbox';
+          musicCheckbox.checked = musicStates && musicStates[index] ? musicStates[index] : false;
+          musicCheckbox.addEventListener('change', (e) => {
+            if (musicStates) {
+              musicStates[index] = e.target.checked;
+            }
+          });
+          listItem.appendChild(musicCheckbox);
         }
 
         const removeButton = document.createElement('button');
@@ -402,8 +470,12 @@
         removeButton.addEventListener('click', () => {
           list.splice(index, 1);
           colors.splice(index, 1);
-          if (type === 'mode') activeStates.splice(index, 1);
-          renderList(type, list, colors, container, activeStates);
+          if (type === 'mode') {
+            activeStates.splice(index, 1);
+            if (times) times.splice(index, 1);
+            if (musicStates) musicStates.splice(index, 1);
+          }
+          renderList(type, list, colors, container, activeStates, times, musicStates);
         });
 
         listItem.appendChild(textInput);
@@ -414,7 +486,7 @@
     }
 
     function openSettings() {
-      renderList('mode', modes, modeColors, modeList, modeActiveStates);
+      renderList('mode', modes, modeColors, modeList, modeActiveStates, modeTimes, modeMusicStates);
       renderList('target', targets, targetColors, targetList);
       settingsModal.classList.add('active');
     }
@@ -432,6 +504,8 @@
         modeColors: JSON.stringify(modeColors),
         targetColors: JSON.stringify(targetColors),
         modeActiveStates: JSON.stringify(modeActiveStates),
+        modeTimes: JSON.stringify(modeTimes),
+        modeMusicStates: JSON.stringify(modeMusicStates),
         currentModeIndex,
         currentTargetIndex
       };
@@ -451,7 +525,7 @@
       modes.push('New Mode');
       modeColors.push('#000000');
       modeActiveStates.push(true);
-      renderList('mode', modes, modeColors, modeList, modeActiveStates);
+      renderList('mode', modes, modeColors, modeList, modeActiveStates, modeTimes, modeMusicStates);
     });
 
     addTargetButton.addEventListener('click', () => {
@@ -475,6 +549,8 @@
       modes = JSON.parse(state.modes);
       targets = JSON.parse(state.targets);
       modeColors = JSON.parse(state.modeColors);
+      modeTimes = state.modeTimes ? JSON.parse(state.modeTimes) : Array(modes.length).fill(0);
+      modeMusicStates = state.modeMusicStates ? JSON.parse(state.modeMusicStates) : Array(modes.length).fill(false);
       targetColors = JSON.parse(state.targetColors);
       modeActiveStates = JSON.parse(state.modeActiveStates);
       currentModeIndex = state.currentModeIndex;
@@ -501,6 +577,44 @@
         socket.emit('stateUpdated', state);
       })
       .catch(err => console.error(err));
+
+    // Music player functionality
+    const musicPlayer = document.getElementById('music-player');
+    let playlist = [];
+    let currentSongIndex = 0;
+
+    // Fetch the music playlist from the server
+    function loadMusicPlaylist() {
+      fetch('/prodash/music-list.json')
+        .then(res => res.json())
+        .then(musicFiles => {
+          playlist = musicFiles;
+          shufflePlaylist();
+        })
+        .catch(err => console.error('Error loading music:', err));
+    }
+
+    // Shuffle the playlist using Fisher-Yates algorithm
+    function shufflePlaylist() {
+      for (let i = playlist.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [playlist[i], playlist[j]] = [playlist[j], playlist[i]];
+      }
+    }
+
+    // Play the next song in the playlist
+    function playNextSong() {
+      if (playlist.length === 0 || !isTimerRunning) return;
+
+      currentSongIndex = (currentSongIndex + 1) % playlist.length;
+      const song = playlist[currentSongIndex];
+
+      musicPlayer.src = `/prodash/music/${song}`;
+      musicPlayer.play().catch(err => console.error('Error playing music:', err));
+    }
+
+    // Add event listeners for music player
+    musicPlayer.addEventListener('ended', playNextSong);
   </script>
 </body>
 </html>
