@@ -208,12 +208,6 @@
     </div>
   </div>
 
-  <!-- Audio element for alarm -->
-  <audio id="alarm-sound" preload="auto">
-    <source src="/prodash/alarm.mp3" type="audio/mp3">
-    Your browser does not support the audio element.
-  </audio>
-  
   <!-- Background music player -->
   <div class="music-container">
     <div id="now-playing" class="now-playing" style="font-size: 0.8rem; margin: 5px 0; text-align: center; display: none;"></div>
@@ -227,30 +221,75 @@
     });
 
     class AudioPlayer {
-      get paused() {
-        return this.player.paused;
-      }
-
       constructor() {
-        this.player = document.createElement('audio');
-        document.querySelector('.music-container').appendChild(this.player);
+        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        this.source = null;
+        this.currentBuffer = null;
+        this.onEnded = null;
+        this.isPlaying = false;
+        this.abortId = Math.random();
       }
 
-      destroy() {
-        if (this.player) {
-          this.player.pause();
-          this.player.remove();
+      async play(url, onfinish) {
+        try {
+          this.abort(); // Stop any current playback
+          this.abortId = Math.random();
+          const currentAbortId = this.abortId;
+
+          const response = await fetch(url);
+          const arrayBuffer = await response.arrayBuffer();
+          const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+
+          if (this.abortId !== currentAbortId) return;
+
+          this.currentBuffer = audioBuffer;
+          this.source = this.audioContext.createBufferSource();
+          this.source.buffer = this.currentBuffer;
+          this.source.connect(this.audioContext.destination);
+          this.source.start(0);
+          this.isPlaying = true;
+
+          this.source.onended = () => {
+            if (this.abortId === currentAbortId && typeof onfinish === 'function') {
+              this.isPlaying = false;
+              onfinish();
+            }
+          };
+        } catch (err) {
+          console.error('WebAudioPlayer play error:', err);
         }
       }
 
-      play(src, onfinish) {
-        this.player.src = src;
-        this.player.play().catch(err => console.error('Error playing audio:', err));
-        this.player.onended = onfinish;
+      pause() {
+        if (this.audioContext.state === 'running') {
+          this.audioContext.suspend();
+        }
       }
 
-      pause() {
-        this.player.pause();
+      resume() {
+        if (this.audioContext.state === 'suspended') {
+          this.audioContext.resume();
+        }
+      }
+
+      abort() {
+        if (this.source) {
+          this.source.stop();
+          this.source.disconnect();
+          this.source = null;
+        }
+        this.isPlaying = false;
+      }
+
+      destroy() {
+        this.abort();
+        if (this.audioContext) {
+          this.audioContext.close().catch(err => console.warn('Error closing audio context:', err));
+        }
+      }
+
+      get paused() {
+        return this.audioContext.state !== 'running';
       }
     }
 
@@ -265,7 +304,7 @@
     let modeActiveStates = [];
     let currentModeIndex = 0;
     let currentTargetIndex = -1;
-    let musicPlayer = new AudioPlayer();
+    let musicPlayer;
 
     // DOM elements
     const clockElement = document.getElementById('clock');
@@ -284,7 +323,6 @@
     const timerContainer = document.getElementById('timer-container');
     const timerDisplay = document.getElementById('timer-display');
     const timerStopButton = document.getElementById('timer-stop');
-    const alarmSound = document.getElementById('alarm-sound');
     const timerPauseButton = document.getElementById('timer-pause');
     
     // Timer variables
@@ -355,23 +393,18 @@
       timerDisplay.textContent = "Time's up!";
       timerDisplay.classList.add('alarm');
 
-      // Play alarm sound
       playAlarmSound();
-
-      // Stop music if playing
-      if (!musicPlayer.paused) {
-        musicPlayer.pause();
-      }
     }
 
     function playAlarmSound() {
-      alarmSound.currentTime = 0;
-      alarmSound.play();
-
-      // Loop the alarm sound
-      if (isAlarmActive) {
-        alarmSound.onended = playAlarmSound;
+      if (musicPlayer) musicPlayer.destroy();
+      musicPlayer = new AudioPlayer();
+      
+      function alarmPlay() {
+        musicPlayer.play('alarm.mp3', alarmPlay);
       }
+
+      alarmPlay();
     }
 
     function stopTimer(sync) {
@@ -386,13 +419,8 @@
       timerDisplay.textContent = "00:00";
       timerDisplay.classList.remove('alarm');
 
-      // Stop alarm sound
-      alarmSound.pause();
-      alarmSound.currentTime = 0;
-      alarmSound.onended = null;
-
-      // Stop music if playing
-      musicPlayer.destroy();
+      // Stop alarm
+      if (musicPlayer) musicPlayer.destroy();
       musicPlayer = new AudioPlayer();
 
       // Hide now playing
@@ -727,10 +755,10 @@
             timerInterval = setInterval(updateTimerDisplay, 1000);
             
             // Start music if needed for this mode
-            if (modeMusicStates[currentModeIndex] && musicPlayer.paused) {
+            if (modeMusicStates[currentModeIndex] && (!musicPlayer || musicPlayer.paused)) {
               loadMusicPlaylist();
             } else {
-              musicPlayer.destroy();
+              if (musicPlayer) musicPlayer.destroy();
               musicPlayer = new AudioPlayer();
             }
           }
@@ -812,11 +840,8 @@
         return;
       }
 
-      // First, clean up any existing audio player
-      if (musicPlayer) {
-        musicPlayer.destroy();
-        musicPlayer = new AudioPlayer();
-      }
+      if (musicPlayer) musicPlayer.destroy();
+      musicPlayer = new AudioPlayer();
       
       // Remove the old player from the DOM
       const musicContainer = document.querySelector('.music-container');
