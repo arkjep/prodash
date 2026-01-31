@@ -531,7 +531,8 @@
         timerInterval = setInterval(updateTimerDisplay, 1000);
         
         // Resume music if it was playing for this mode
-        if (modeMusicStates[currentModeIndex]) {
+        const currentMode = modes[currentModeIndex];
+        if (currentMode && currentMode.hasMusic) {
           playNextSong();
         }
       } else {
