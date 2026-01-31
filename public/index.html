@@ -533,7 +533,12 @@
         // Resume music if it was playing for this mode
         const currentMode = modes[currentModeIndex];
         if (currentMode && currentMode.hasMusic) {
-          playNextSong();
+          // Load playlist first if needed, then play
+          if (playlist.length === 0) {
+            loadMusicPlaylist();
+          } else {
+            playNextSong();
+          }
         }
       } else {
         // Pause - stop the timer but remember remaining time
