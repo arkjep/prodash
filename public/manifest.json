@@ -10,15 +10,9 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/prodash/icon-192.svg",
-      "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/prodash/icon-512.svg",
+      "src": "/prodash/icon.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]
