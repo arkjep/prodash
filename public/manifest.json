@@ -2,16 +2,23 @@
   "name": "ProDash Dashboard",
   "short_name": "ProDash",
   "description": "Personal Dashboard App",
-  "start_url": "/",
+  "start_url": "/prodash/",
+  "scope": "/prodash/",
   "display": "standalone",
   "background_color": "#1a1a2e",
   "theme_color": "#1a1a2e",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/icon.png",
+      "src": "/prodash/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/prodash/icon-512.svg",
       "sizes": "512x512",
-      "type": "image/png",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ]

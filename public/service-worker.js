@@ -1,8 +1,8 @@
 const CACHE_NAME = 'prodash-v1';
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/music-list.json'
+  '/prodash/',
+  '/prodash/index.html',
+  '/prodash/music-list.json'
 ];
 
 // Install event - cache resources

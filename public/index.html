@@ -11,7 +11,7 @@
   <meta name="theme-color" content="#1a1a2e">
   
   <!-- Manifest -->
-  <link rel="manifest" href="/manifest.json">
+  <link rel="manifest" href="/prodash/manifest.json">
   
   <title>Dashboard</title>
   <style>
@@ -983,7 +983,7 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/service-worker.js')
+        navigator.serviceWorker.register('/prodash/service-worker.js', { scope: '/prodash/' })
           .then(registration => {
             console.log('ServiceWorker registered successfully:', registration.scope);
           })
