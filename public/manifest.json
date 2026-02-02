@@ -4,10 +4,12 @@
   "description": "Personal Dashboard App",
   "start_url": "/prodash/",
   "scope": "/prodash/",
-  "display": "standalone",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
   "background_color": "#1a1a2e",
   "theme_color": "#1a1a2e",
   "orientation": "portrait",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/prodash/icon.png",

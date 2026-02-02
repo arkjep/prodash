@@ -10,16 +10,29 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#1a1a2e">
   
+  <!-- Amazon Silk / Fire Tablet Support -->
+  <meta name="full-screen" content="yes">
+  <meta name="browsermode" content="application">
+  
   <!-- Manifest -->
   <link rel="manifest" href="/prodash/manifest.json">
   
-  <title>Dashboard</title>
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="/prodash/icon.png">
+  <link rel="apple-touch-icon" href="/prodash/icon.png">
+  
+  <title>Prodash</title>
   <style>
+    * {
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+    }
     html {
       overflow: hidden;
       height: 100%;
       position: fixed;
       width: 100%;
+      -webkit-text-size-adjust: 100%;
     }
     body {
       margin: 0;
@@ -29,10 +42,12 @@
       align-items: center;
       justify-content: space-between;
       background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      background-attachment: fixed;
       height: 100vh;
       height: 100dvh; /* Use dynamic viewport height for better mobile support */
       color: #e8e8e8;
       padding: 20px;
+      padding: env(safe-area-inset-top, 20px) env(safe-area-inset-right, 20px) env(safe-area-inset-bottom, 20px) env(safe-area-inset-left, 20px);
       box-sizing: border-box;
       overflow: hidden;
       position: fixed;
@@ -40,6 +55,8 @@
       touch-action: manipulation; /* Prevents double-tap zoom */
       -webkit-user-select: none; /* Prevents text selection on long press */
       user-select: none;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
     .clock {
       font-size: 4.5rem;
@@ -64,9 +81,15 @@
       cursor: pointer;
       transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.2s ease;
       background-color: #1e1e1e;
-      color: #000000;
+      color: #ffffff;
       border: 2px solid rgba(255, 255, 255, 0.1);
       backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+    }
+    .card:active {
+      transform: scale(0.98);
     }
     .card:hover {
       transform: translateY(-5px) scale(1.02);
@@ -105,6 +128,7 @@
       max-width: 90%;
       max-height: 90vh;
       overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
     }
     .modal.active {
       display: block;
@@ -181,9 +205,20 @@
       margin-right: 10px;
       width: 50px;
       height: 35px;
-      border: none;
+      border: 1px solid rgba(255, 255, 255, 0.2);
       border-radius: 6px;
       cursor: pointer;
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+    }
+    .list-item input[type="color"]::-webkit-color-swatch-wrapper {
+      padding: 0;
+      border-radius: 6px;
+    }
+    .list-item input[type="color"]::-webkit-color-swatch {
+      border: none;
+      border-radius: 6px;
     }
     .list-item input[type="checkbox"] {
       margin-right: 10px;
